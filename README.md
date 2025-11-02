@@ -99,7 +99,7 @@ graph TD;
       * **Recovery Services Vault (ASR):** O "cérebro" da operação, orquestrando a replicação e o failover.
       * **Rede Virtual (VNet) de DR:** Uma rede virtual isolada, pré-configurada para receber as VMs em caso de desastre.
       * **Azure Virtual Network Gateway:** Componente central que encerra as VPNs Site-to-Site (da Matriz e da Filial) e Ponto-a-Site (para usuários).
-      * **Contas de Armazenamento:** Recebem os dados replicados dos discos das VMs on-premises.
+      * **Contas de Armamento:** Recebem os dados replicados dos discos das VMs on-premises.
 
 -----
 
@@ -184,7 +184,10 @@ O projeto foi executado em 5 fases principais para garantir uma implementação 
 ### 3\. Planejamento de Rede Pós-Failover
 
   * **Desafio:** Após o failover para o Azure, como os usuários se conectariam aos serviços? Os IPs das VMs mudaram para os da VNet do Azure.
-  * **Lição:** Um plano de DR não termina quando as VMs ligam. É preciso ter um plano para **redirecionar o tráfego**. A solução envolveu a ativação de um **Gateway de VPN Ponto-a-Site (P2S) no Azure**, permitindo que os usuários se conectassem diretamente à VNet de DR, e a preparação de scripts para atualização de registros DNS.
+  * **Lição:** Um plano de DR não termina quando as VMs ligam. É preciso ter um plano para **redirecionar o tráfego**. A solução de rede foi dupla:
+    1.  A **VPN Site-to-Site (S2S)** já existente da Filial para o Azure permitiu que os usuários no escritório da Filial continuassem trabalhando, acessando os serviços agora na nuvem de forma transparente.
+    2.  A ativação de um **Gateway de VPN Ponto-a-Site (P2S)** no Azure permitiu que usuários remotos (em casa) também se conectassem diretamente à VNet de DR.
+        Isso, combinado com scripts para atualização de registros DNS, garantiu o acesso contínuo.
 
 -----
 
