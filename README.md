@@ -22,7 +22,7 @@ O objetivo era claro: **projetar e implementar uma solução de DR robusta, fina
 
 ## 2. A Arquitetura da Solução Híbrida (Multi-Site)
 
-A solução implementada foi uma **arquitetura híbrida** que utiliza o **Microsoft Azure** como o site de *failover* principal e uma **Filial Secundária** como suporte de identidade (Active Directory Secundário).
+A solução implementada foi uma **arquitetura híbrida** que utiliza o **Microsoft Azure** como o site de *failover* principal e uma **Filial Secundária** como suporte de identidade (Active Directory Secundário), com conectividade de rede totalmente redundante.
 
 ### Diagrama da Arquitetura
 
@@ -32,16 +32,17 @@ graph TD;
     subgraph "Ambiente On-Premises<br>(Matriz)"
         direction LR
         VM_AD1["VM: AD-01"]
+        ONPREM_GW("Appliance Firewall<br>WatchGuard Matriz")
         VM_DB["VM: DB-01"]
         VM_APP["VM: APP-01"]
         VM_FS["VM: FS-01 (File Server)"]
-        ONPREM_GW("Appliance Firewall<br>WatchGuard Matriz")
     end
 
     subgraph "Microsoft Azure (Site de DR)"
         direction LR
         ASR["Recovery Services Vault"]
         VNET_DR["VNet de DR"]
+        AZ_VPN_GW["Virtual Network Gateway<br>(VPN S2S/P2S)"]
         VM_AD1_REP("Replica: AD-01")
         VM_DB_REP("Replica: DB-01")
         VM_APP_REP("Replica: APP-01")
@@ -49,6 +50,7 @@ graph TD;
         
         ASR --> VNET_DR
         VNET_DR --- VM_AD1_REP & VM_DB_REP & VM_APP_REP & VM_FS_REP
+        AZ_VPN_GW --> VNET_DR
     end
 
     subgraph "Filial Secundária"
@@ -57,7 +59,7 @@ graph TD;
         EXT_GW("Appliance Firewall<br>WatchGuard Filial")
     end
 
-    %% Definição das Conexões
+    %% Definição das Conexões de Replicação
     VM_AD1 -- "Replicação ASR (via Internet)" --> ASR
     VM_DB -- "Replicação ASR (via Internet)" --> ASR
     VM_APP -- "Replicação ASR (via Internet)" --> ASR
@@ -65,11 +67,13 @@ graph TD;
 
     VM_AD1 -. "Replicação AD" .-> VM_AD2
     
-    %% Conexão VPN
-    ONPREM_GW -- "VPN Site-to-Site" --- EXT_GW
+    %% Conexões VPN Site-to-Site
+    ONPREM_GW -- "VPN Site-to-Site" --- AZ_VPN_GW
+    EXT_GW -- "VPN Site-to-Site" --- AZ_VPN_GW 
     
     style ASR fill:#0078D4,stroke:#FFF,stroke-width:2px,color:#FFF
     style VNET_DR fill:#0078D4,stroke:#FFF,stroke-width:2px,color:#FFF
+    style AZ_VPN_GW fill:#0078D4,stroke:#FFF,stroke-width:2px,color:#FFF
     style VM_AD1_REP fill:#BCE8FF,stroke:#0078D4,stroke-width:1px,color:#000
     style VM_DB_REP fill:#BCE8FF,stroke:#0078D4,stroke-width:1px,color:#000
     style VM_APP_REP fill:#BCE8FF,stroke:#0078D4,stroke-width:1px,color:#000
@@ -82,18 +86,19 @@ graph TD;
 
       * Servidores host **Microsoft Hyper-V**.
       * VMs Críticas: `AD-01` (Active Directory), `DB-01` (Banco de Dados), `APP-01` (Aplicação), `FS-01` (File Server).
-      * Gateway de VPN/Firewall: **Appliance Físico WatchGuard**.
+      * Gateway de VPN/Firewall: **Appliance Físico WatchGuard**, com VPN S2S para a Filial e para o Azure.
 
 2.  **Filial Secundária (Suporte de Identidade):**
 
       * Provedor: **Infraestrutura Interna (Filial)**.
       * Serviços: Hospedagem de uma VM com **Active Directory Secundário (AD-02)**.
-      * Conectividade: Uma **VPN Site-to-Site** persistente com o ambiente On-Premises (Matriz), garantindo a replicação contínua do Active Directory.
+      * Conectividade: Uma **VPN Site-to-Site** persistente com a Matriz e uma **VPN Site-to-Site** secundária para o Azure.
 
 3.  **Microsoft Azure (Site de Disaster Recovery):**
 
       * **Recovery Services Vault (ASR):** O "cérebro" da operação, orquestrando a replicação e o failover.
       * **Rede Virtual (VNet) de DR:** Uma rede virtual isolada, pré-configurada para receber as VMs em caso de desastre.
+      * **Azure Virtual Network Gateway:** Componente central que encerra as VPNs Site-to-Site (da Matriz e da Filial) e Ponto-a-Site (para usuários).
       * **Contas de Armazenamento:** Recebem os dados replicados dos discos das VMs on-premises.
 
 -----
@@ -104,6 +109,7 @@ graph TD;
       * Microsoft Azure
       * Azure Site Recovery (ASR)
       * Azure Virtual Network
+      * Azure Virtual Network Gateway
       * Azure Storage Accounts
   * **Virtualização On-Premises (Matriz e Filial):**
       * Microsoft Hyper-V
@@ -114,7 +120,8 @@ graph TD;
       * Aplicação Interna de ERP (Baseada em IIS)
       * Serviços de Arquivo (File Server)
   * **Networking:**
-      * VPN Site-to-Site
+      * VPN Site-to-Site (Topologia Hub-and-Spoke Híbrida)
+      * VPN Ponto-a-Site (no Azure VNG)
       * Firewall: **Appliance Físico WatchGuard**
 
 -----
@@ -127,13 +134,14 @@ O projeto foi executado em 5 fases principais para garantir uma implementação 
 
 1.  **Mapeamento de Dependências:** Análise de quais VMs dependiam de quais (ex: `APP-01` depende de `DB-01` e `AD-01`).
 2.  **Definição de RTO/RPO:** As metas de negócio definidas foram **RTO \< 4 horas** e **RPO \< 1 hora**.
-3.  **Design da VNet no Azure:** Desenho da sub-rede de DR, regras de NSG (Network Security Group) e planejamento de endereçamento IP para evitar conflitos.
+3.  **Design da VNet no Azure:** Desenho da sub-rede de DR, regras de NSG, planejamento de IP e provisionamento do **Virtual Network Gateway**.
 
-### Fase 2: Configuração da Infraestrutura de Identidade
+### Fase 2: Configuração da Infraestrutura de Rede e Identidade
 
 1.  **Provisionamento do AD Secundário:** Criação da VM `AD-02` na infraestrutura da Filial.
-2.  **Configuração da VPN S2S:** Estabelecimento do túnel VPN seguro entre a Matriz e a Filial usando os appliances WatchGuard.
-3.  **Promoção do DC:** Promoção do `AD-02` como Controlador de Domínio secundário e validação da replicação do AD.
+2.  **Configuração da VPN S2S (Matriz \<-\> Filial):** Estabelecimento do túnel VPN seguro entre a Matriz e a Filial usando os appliances WatchGuard para replicação do AD.
+3.  **Configuração da VPN S2S (Matriz/Filial \<-\> Azure):** Estabelecimento de túneis VPN redundantes de ambos os sites on-premises para o Virtual Network Gateway no Azure.
+4.  **Promoção do DC:** Promoção do `AD-02` como Controlador de Domínio secundário e validação da replicação do AD.
 
 ### Fase 3: Configuração do Azure Site Recovery (ASR)
 
