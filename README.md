@@ -157,7 +157,7 @@ O projeto foi executado em 5 fases principais para garantir uma implementação 
       * **Grupo 2:** `DB-01` (Banco de dados deve estar pronto para a aplicação)
       * **Grupo 3:** `APP-01` e `FS-01` (Serviços de aplicação e arquivos)
 
-### Fase 5: Teste de Failover (DR Drill)
+### Fase 5: Teste de Failover
 
 1.  **Execução do Teste:** Utilização da função "Test Failover" do ASR, que cria as VMs em uma rede isolada no Azure **sem impactar a produção**.
 2.  **Validação:** Acesso às VMs no Azure para validar:
