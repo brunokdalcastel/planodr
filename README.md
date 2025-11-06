@@ -70,6 +70,7 @@ graph TD;
     %% Conexões VPN Site-to-Site
     ONPREM_GW -- "VPN Site-to-Site" --- AZ_VPN_GW
     EXT_GW -- "VPN Site-to-Site" --- AZ_VPN_GW 
+    ONPREM_GW -- "VPN S2S (Matriz-Filial)" --- EXT_GW
     
     style ASR fill:#0078D4,stroke:#FFF,stroke-width:2px,color:#FFF
     style VNET_DR fill:#0078D4,stroke:#FFF,stroke-width:2px,color:#FFF
