@@ -1,5 +1,5 @@
 
-# Estudo de Caso: Implementação de Disaster Recovery (DR) Híbrido com Azure Site Recovery
+Implementação de Disaster Recovery (DR) Híbrido com Azure Site Recovery
 
 ![Badge de Status](https://img.shields.io/badge/status-Conclu%C3%ADdo-brightgreen)
 ![Badge de Tecnologia](https://img.shields.io/badge/Tecnologia-Azure%20Site%20Recovery-blue)
